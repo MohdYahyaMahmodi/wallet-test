@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sleep Crypto Wallet</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.5/cdn.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div x-data="wallet()" class="container mx-auto px-4 py-8 max-w-md">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">Sleep Crypto Wallet</h1>
+            <p class="text-gray-600 mt-2">Secure. Simple. Safe.</p>
+        </div>
+
+        <!-- Main Content -->
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <!-- Initial Check -->
+            <div x-show="!hasWallet && !isCreating" class="space-y-4">
+                <p class="text-gray-700 text-center mb-4">Do you have a wallet?</p>
+                <div class="flex space-x-4">
+                    <button 
+                        @click="showAccessForm = true" 
+                        class="w-1/2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition">
+                        Yes, Access Wallet
+                    </button>
+                    <button 
+                        @click="startWalletCreation" 
+                        class="w-1/2 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition">
+                        Create New Wallet
+                    </button>
+                </div>
+            </div>
+
+            <!-- Access Existing Wallet -->
+            <div x-show="showAccessForm" class="space-y-4">
+                <h2 class="text-xl font-semibold text-center mb-4">Access Your Wallet</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Wallet ID</label>
+                        <input 
+                            type="text" 
+                            x-model="accessWalletId"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Enter your wallet ID">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Recovery Phrase</label>
+                        <input 
+                            type="password" 
+                            x-model="accessPhrase"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Enter your 12-word phrase">
+                    </div>
+                    <button 
+                        @click="accessWallet"
+                        class="w-full bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition">
+                        Access Wallet
+                    </button>
+                    <button 
+                        @click="showAccessForm = false"
+                        class="w-full bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition">
+                        Back
+                    </button>
+                </div>
+            </div>
+
+            <!-- Create New Wallet -->
+            <div x-show="isCreating" class="space-y-4">
+                <h2 class="text-xl font-semibold text-center mb-4">Your New Wallet</h2>
+                <div class="bg-gray-100 p-4 rounded-lg">
+                    <p class="text-sm font-medium text-gray-700 mb-2">Wallet ID:</p>
+                    <p class="font-mono text-sm break-all" x-text="walletId"></p>
+                </div>
+                <div class="bg-gray-100 p-4 rounded-lg">
+                    <p class="text-sm font-medium text-gray-700 mb-2">Recovery Phrase:</p>
+                    <p class="font-mono text-sm break-all" x-text="mnemonic"></p>
+                </div>
+                <div class="bg-yellow-100 p-4 rounded-lg">
+                    <p class="text-sm text-yellow-800">
+                        ⚠️ Save this information securely. You will need it to access your wallet.
+                    </p>
+                </div>
+                <button 
+                    @click="confirmWalletCreation"
+                    class="w-full bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition">
+                    I've Saved My Information
+                </button>
+            </div>
+
+            <!-- Wallet Dashboard -->
+            <div x-show="isLoggedIn" class="space-y-4">
+                <h2 class="text-xl font-semibold text-center mb-4">Wallet Dashboard</h2>
+                <div class="bg-gray-100 p-4 rounded-lg">
+                    <p class="text-sm font-medium text-gray-700 mb-2">Wallet ID:</p>
+                    <p class="font-mono text-sm break-all" x-text="walletId"></p>
+                </div>
+                <div class="bg-blue-100 p-4 rounded-lg">
+                    <p class="text-2xl font-bold text-center text-blue-800">0.00 ETH</p>
+                    <p class="text-center text-blue-600">$0.00 USD</p>
+                </div>
+                <button 
+                    @click="logout"
+                    class="w-full bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition">
+                    Logout
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function wallet() {
+            return {
+                hasWallet: false,
+                isCreating: false,
+                isLoggedIn: false,
+                showAccessForm: false,
+                walletId: '',
+                mnemonic: '',
+                accessWalletId: '',
+                accessPhrase: '',
+                
+                // Word list for generating mnemonic
+                wordList: [
+                    'abandon', 'ability', 'able', 'about', 'above', 'absent',
+                    'absorb', 'abstract', 'absurd', 'abuse', 'access', 'accident',
+                    'account', 'accuse', 'achieve', 'acid', 'acoustic', 'acquire',
+                    'across', 'act', 'action', 'actor', 'actress', 'actual',
+                    'adapt', 'add', 'addict', 'address', 'adjust', 'admit',
+                    'adult', 'advance', 'advice', 'aerobic', 'affair', 'afford',
+                    'afraid', 'again', 'age', 'agent', 'agree', 'ahead'
+                ],
+
+                // Generate random mnemonic phrase
+                generateMnemonic() {
+                    const words = [];
+                    for (let i = 0; i < 12; i++) {
+                        const randomIndex = Math.floor(Math.random() * this.wordList.length);
+                        words.push(this.wordList[randomIndex]);
+                    }
+                    return words.join(' ');
+                },
+
+                // Generate wallet ID
+                generateWalletId() {
+                    return 'w_' + CryptoJS.SHA256(Math.random().toString()).toString().substring(0, 16);
+                },
+
+                // Start wallet creation process
+                startWalletCreation() {
+                    this.isCreating = true;
+                    this.walletId = this.generateWalletId();
+                    this.mnemonic = this.generateMnemonic();
+                },
+
+                // Confirm wallet creation
+                confirmWalletCreation() {
+                    // In a real application, we would save encrypted wallet data
+                    localStorage.setItem('walletId', this.walletId);
+                    localStorage.setItem('mnemonic', CryptoJS.AES.encrypt(this.mnemonic, 'secret').toString());
+                    this.isCreating = false;
+                    this.isLoggedIn = true;
+                },
+
+                // Access existing wallet
+                accessWallet() {
+                    const storedWalletId = localStorage.getItem('walletId');
+                    const encryptedMnemonic = localStorage.getItem('mnemonic');
+                    
+                    if (storedWalletId && encryptedMnemonic) {
+                        const decryptedMnemonic = CryptoJS.AES.decrypt(encryptedMnemonic, 'secret').toString(CryptoJS.enc.Utf8);
+                        
+                        if (this.accessWalletId === storedWalletId && this.accessPhrase === decryptedMnemonic) {
+                            this.walletId = storedWalletId;
+                            this.showAccessForm = false;
+                            this.isLoggedIn = true;
+                        } else {
+                            alert('Invalid wallet ID or recovery phrase');
+                        }
+                    } else {
+                        alert('No wallet found');
+                    }
+                },
+
+                // Logout
+                logout() {
+                    this.isLoggedIn = false;
+                    this.showAccessForm = false;
+                    this.accessWalletId = '';
+                    this.accessPhrase = '';
+                },
+
+                // Initialize
+                init() {
+                    this.hasWallet = !!localStorage.getItem('walletId');
+                }
+            }
+        }
+    </script>
+</body>
+</html>
